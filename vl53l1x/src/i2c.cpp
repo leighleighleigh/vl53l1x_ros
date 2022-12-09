@@ -9,7 +9,7 @@
 
 int fd;
 
-void i2c_setup(uint8_t bus, uint8_t addr)
+bool i2c_setup(uint8_t bus, uint8_t addr)
 {
 	char filename[50];
 	sprintf(filename, "/dev/i2c-%d", bus);
@@ -24,8 +24,10 @@ void i2c_setup(uint8_t bus, uint8_t addr)
 	int rc = ioctl(fd, I2C_SLAVE, addr);
 	if (rc < 0) {
 		ROS_FATAL("Failed to select I2C device with address 0x%02x", addr);
-		ros::shutdown();
+		return false;
 	}
+
+	return true;
 }
 
 void i2c_release()

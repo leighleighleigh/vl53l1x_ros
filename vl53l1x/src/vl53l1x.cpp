@@ -15,10 +15,12 @@
 #include <vector>
 #include <ros/ros.h>
 #include <sensor_msgs/Range.h>
+#include <std_msgs/Bool.h>
 #include <vl53l1x/MeasurementData.h>
 
 #include "vl53l1_api.h"
 #include "i2c.h"
+#include <wiringPi.h>
 
 #define xSTR(x) #x
 #define STR(x) xSTR(x)
@@ -37,21 +39,36 @@ int main(int argc, char **argv)
 
 	sensor_msgs::Range range;
 	vl53l1x::MeasurementData data;
+	
 	range.radiation_type = sensor_msgs::Range::INFRARED;
+	ros::Publisher setup_done_pub = nh_priv.advertise<std_msgs::Bool>("setup_done", 20);
 	ros::Publisher range_pub = nh_priv.advertise<sensor_msgs::Range>("range", 20);
 	ros::Publisher data_pub = nh_priv.advertise<vl53l1x::MeasurementData>("data", 20);
+	ros::Rate xshut_toggle_rate(2.0);
 
 	// Read parameters
-	int mode, i2c_bus, i2c_address;
+	int mode, i2c_bus, i2c_address, i2c_address_default, xshut_gpio;
 	double poll_rate, timing_budget, offset;
-	bool ignore_range_status;
+	bool ignore_range_status, wait_for_setup_signal, found_device_on_bus;
 	std::vector<int> pass_statuses { VL53L1_RANGESTATUS_RANGE_VALID,
 	                                 VL53L1_RANGESTATUS_RANGE_VALID_NO_WRAP_CHECK_FAIL,
 	                                 VL53L1_RANGESTATUS_RANGE_VALID_MERGED_PULSE };
 
 	nh_priv.param("mode", mode, 3);
 	nh_priv.param("i2c_bus", i2c_bus, 1);
-	nh_priv.param("i2c_address", i2c_address, 0x29);
+	// The address we try to connect to first - if not found, we will use XSHUT to change it.
+	nh_priv.param("i2c_address", i2c_address, 0x40);
+	// i2c_address_default is the address we will look for when toggling the XSHUT pin. 
+	// The device address will then be changed to i2c_address, if it differs.
+	nh_priv.param("i2c_address_default", i2c_address_default, 0x29);
+	// wiringPi uses it's own GPIO numbering system
+	// you may find a useful reference table here
+	// https://pinout.xyz/pinout/wiringpi
+	nh_priv.param("xshut_gpio", xshut_gpio, 27);
+	// To handle multiple devices, all competing for the I2C bus during setup,
+	// we can 'chain' them via the ~setup topic boolean. Set this to 'True' for every
+	// sensor after the first one, and remap the topics appropriately.
+	nh_priv.param("wait_for_setup", wait_for_setup_signal, true);
 	nh_priv.param("poll_rate", poll_rate, 100.0);
 	nh_priv.param("ignore_range_status", ignore_range_status, false);
 	nh_priv.param("timing_budget", timing_budget, 0.1);
@@ -70,14 +87,67 @@ int main(int argc, char **argv)
 	// The minimum inter-measurement period must be longer than the timing budget + 4 ms (*)
 	double inter_measurement_period = timing_budget + 0.004;
 
-	// Setup I2C bus
-	i2c_setup(i2c_bus, i2c_address);
-
-	// Init sensor
+	
+	// Our device variables	
 	VL53L1_Dev_t dev;
 	VL53L1_Error dev_error;
-	VL53L1_software_reset(&dev);
-	VL53L1_WaitDeviceBooted(&dev);
+
+	// If xshut_gpio is not -1, we will setup a GPIO pin to control it
+	if (xshut_gpio != -1)
+	{
+		// Initialise GPIO
+		wiringPiSetup();
+		pinMode(xshut_gpio, OUTPUT);
+
+		digitalWrite(xshut_gpio, LOW); // Put device to sleep, XSHUT low
+		xshut_toggle_rate.sleep(); // Wait for sleep
+
+		// Wait for a message on the ~setup topic, before continuing.
+		// A message will be published on the setup_done topic, when we are done
+		// This allows sensors to be chained together
+		if (wait_for_setup_signal)
+		{
+			ROS_INFO("Waiting for message on ~setup");
+			ros::topic::waitForMessage<std_msgs::Bool>("setup", nh_priv);
+		}
+
+		digitalWrite(xshut_gpio, HIGH); // Wake device up
+		xshut_toggle_rate.sleep(); // Wait for wakeup
+
+		// Try to find device at the specified default address
+		if (i2c_address_default != i2c_address)
+		{
+			found_device_on_bus = i2c_setup(i2c_bus, i2c_address_default);
+
+			// If unsuccessful, abort
+			if (!found_device_on_bus)
+			{
+				ROS_FATAL("Failed to find I2C device at default address 0x%02x", i2c_address_default);
+				ros::shutdown();
+			}else{
+				ROS_INFO("Found I2C device at default address 0x%02x, remapping to 0x%02x\n", i2c_address_default, i2c_address);
+				VL53L1_software_reset(&dev);
+				VL53L1_WaitDeviceBooted(&dev);
+				VL53L1_SetDeviceAddress(&dev,i2c_address<<1);
+			}
+		}
+	}
+	
+	// Setup I2C bus, first trying the target address in case the sensor has been pre-configured
+	found_device_on_bus = i2c_setup(i2c_bus, i2c_address);
+
+	if (!found_device_on_bus)
+	{
+		ROS_WARN("Failed to find I2C device at target address 0x%02x", i2c_address);
+		ros::shutdown();
+	}
+
+	// Setup is complete - in the sense that we have finished competing for the default I2C address
+	std_msgs::Bool donemsg;
+	donemsg.data = true;
+	setup_done_pub.publish(donemsg);
+
+	// Init sensor
 	VL53L1_DataInit(&dev);
 	VL53L1_StaticInit(&dev);
 	VL53L1_SetPresetMode(&dev, VL53L1_PRESETMODE_AUTONOMOUS);

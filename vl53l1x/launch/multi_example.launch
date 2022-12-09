@@ -1,0 +1,35 @@
+<launch>
+    <node pkg="vl53l1x" type="vl53l1x_node" name="vl53l1x_right" clear_params="true">
+        <param name="mode" value="3"/>
+        <param name="i2c_bus" value="1"/>
+        <param name="i2c_address" value="0x41"/>
+        <param name="xshut_gpio" value="27"/>
+        <param name="wait_for_setup" value="false"/>
+        <param name="poll_rate" value="100"/>
+        <param name="ignore_range_status" value="false"/>
+        <param name="timing_budget" value="0.1"/>
+        <param name="offset" value="0.0"/>
+        <param name="frame_id" value=""/>
+        <param name="field_of_view" value="0.471239"/>
+        <param name="min_range" value="0.0"/>
+        <param name="max_range" value="4.0"/>
+
+	<remap from="~setup_done" to="/vl53l1x_left/setup"/>
+    </node>
+
+    <node pkg="vl53l1x" type="vl53l1x_node" name="vl53l1x_left" clear_params="true">
+        <param name="mode" value="3"/>
+        <param name="i2c_bus" value="1"/>
+        <param name="i2c_address" value="0x42"/>
+        <param name="xshut_gpio" value="16"/>
+        <param name="wait_for_setup" value="true"/>
+        <param name="poll_rate" value="100"/>
+        <param name="ignore_range_status" value="false"/>
+        <param name="timing_budget" value="0.1"/>
+        <param name="offset" value="0.0"/>
+        <param name="frame_id" value=""/>
+        <param name="field_of_view" value="0.471239"/>
+        <param name="min_range" value="0.0"/>
+        <param name="max_range" value="4.0"/>
+    </node>
+</launch>

@@ -8,7 +8,7 @@
 #define EXTERNC
 #endif
 
-void i2c_setup(uint8_t bus, uint8_t addr);
+bool i2c_setup(uint8_t bus, uint8_t addr);
 
 void i2c_release();
 
