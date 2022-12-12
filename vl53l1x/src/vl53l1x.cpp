@@ -41,9 +41,9 @@ int main(int argc, char **argv)
 	vl53l1x::MeasurementData data;
 	
 	range.radiation_type = sensor_msgs::Range::INFRARED;
-	ros::Publisher setup_done_pub = nh_priv.advertise<std_msgs::Bool>("setup_done", 20);
-	ros::Publisher range_pub = nh_priv.advertise<sensor_msgs::Range>("range", 20);
-	ros::Publisher data_pub = nh_priv.advertise<vl53l1x::MeasurementData>("data", 20);
+	ros::Publisher setup_done_pub = nh_priv.advertise<std_msgs::Bool>("setup_done", 50, true);
+	ros::Publisher range_pub = nh_priv.advertise<sensor_msgs::Range>("range", 50);
+	ros::Publisher data_pub = nh_priv.advertise<vl53l1x::MeasurementData>("data", 50);
 	ros::Rate xshut_toggle_rate(2.0);
 
 	// Read parameters
@@ -77,6 +77,7 @@ int main(int argc, char **argv)
 	nh_priv.param("field_of_view", range.field_of_view, 0.471239f); // 27 deg, source: datasheet
 	nh_priv.param("min_range", range.min_range, 0.0f);
 	nh_priv.param("max_range", range.max_range, 4.0f);
+
 	nh_priv.getParam("pass_statuses", pass_statuses);
 
 	if (timing_budget < 0.02 || timing_budget > 1) {
@@ -129,6 +130,7 @@ int main(int argc, char **argv)
 				VL53L1_software_reset(&dev);
 				VL53L1_WaitDeviceBooted(&dev);
 				VL53L1_SetDeviceAddress(&dev,i2c_address<<1);
+				xshut_toggle_rate.sleep(); // Wait for wakeup
 			}
 		}
 	}
