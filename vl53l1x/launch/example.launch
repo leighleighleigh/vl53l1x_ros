@@ -1,15 +1,15 @@
 <launch>
-    <node pkg="vl53l1x" type="vl53l1x_node" name="vl53l1x_left" clear_params="true" output="screen">
+    <node pkg="vl53l1x" type="vl53l1x_node" name="vl53l1x" clear_params="true" output="screen">
         <param name="mode" value="3"/>
         <param name="i2c_bus" value="1"/>
-        <param name="i2c_address" value="66"/>
+        <param name="i2c_address" value="67"/>
         <param name="xshut_gpio" value="16"/>
-        <param name="wait_for_setup" value="false"/>
-        <param name="poll_rate" value="10"/>
+        <param name="wait_for_setup" value="true"/>
+        <param name="poll_rate" value="20"/>
         <param name="ignore_range_status" value="false"/>
         <param name="timing_budget" value="0.1"/>
         <param name="offset" value="0.0"/>
-        <param name="frame_id" value="tof_link_left"/>
+        <param name="frame_id" value="tof_link"/>
         <param name="field_of_view" value="0.471239"/>
         <param name="min_range" value="0.0"/>
         <param name="max_range" value="4.0"/>

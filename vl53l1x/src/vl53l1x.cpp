@@ -44,7 +44,7 @@ int main(int argc, char **argv)
 	ros::Publisher setup_done_pub = nh_priv.advertise<std_msgs::Bool>("setup_done", 50, true);
 	ros::Publisher range_pub = nh_priv.advertise<sensor_msgs::Range>("range", 50);
 	ros::Publisher data_pub = nh_priv.advertise<vl53l1x::MeasurementData>("data", 50);
-	ros::Rate xshut_toggle_rate(2.0);
+	ros::Rate xshut_toggle_rate(0.5);
 
 	// Read parameters
 	int mode, i2c_bus, i2c_address, i2c_address_default, xshut_gpio;
@@ -100,6 +100,7 @@ int main(int argc, char **argv)
 		wiringPiSetup();
 		pinMode(xshut_gpio, OUTPUT);
 
+		ROS_INFO("GPIO %d LOW",xshut_gpio);
 		digitalWrite(xshut_gpio, LOW); // Put device to sleep, XSHUT low
 		xshut_toggle_rate.sleep(); // Wait for sleep
 
@@ -112,6 +113,7 @@ int main(int argc, char **argv)
 			ros::topic::waitForMessage<std_msgs::Bool>("setup", nh_priv);
 		}
 
+		ROS_INFO("GPIO %d HIGH",xshut_gpio);
 		digitalWrite(xshut_gpio, HIGH); // Wake device up
 		xshut_toggle_rate.sleep(); // Wait for wakeup
 
