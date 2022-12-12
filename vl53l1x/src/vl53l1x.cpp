@@ -111,6 +111,8 @@ int main(int argc, char **argv)
 		{
 			ROS_INFO("Waiting for message on ~setup");
 			ros::topic::waitForMessage<std_msgs::Bool>("setup", nh_priv);
+			ROS_INFO("Got setup message!");
+			xshut_toggle_rate.sleep();
 		}
 
 		ROS_INFO("GPIO %d HIGH",xshut_gpio);
@@ -132,7 +134,6 @@ int main(int argc, char **argv)
 				VL53L1_software_reset(&dev);
 				VL53L1_WaitDeviceBooted(&dev);
 				VL53L1_SetDeviceAddress(&dev,i2c_address<<1);
-				xshut_toggle_rate.sleep(); // Wait for wakeup
 			}
 		}
 	}
@@ -145,11 +146,6 @@ int main(int argc, char **argv)
 		ROS_WARN("Failed to find I2C device at target address 0x%02x", i2c_address);
 		ros::shutdown();
 	}
-
-	// Setup is complete - in the sense that we have finished competing for the default I2C address
-	std_msgs::Bool donemsg;
-	donemsg.data = true;
-	setup_done_pub.publish(donemsg);
 
 	// Init sensor
 	VL53L1_DataInit(&dev);
@@ -197,6 +193,11 @@ int main(int argc, char **argv)
 	ROS_INFO("VL53L1X: ranging");
 
 	VL53L1_RangingMeasurementData_t measurement_data;
+
+	// Setup is complete - in the sense that we have finished competing for the default I2C address
+	std_msgs::Bool donemsg;
+	donemsg.data = true;
+	setup_done_pub.publish(donemsg);
 
 	// Main loop
 	ros::Rate r(poll_rate);
